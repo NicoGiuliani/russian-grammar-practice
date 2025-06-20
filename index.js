@@ -18,8 +18,7 @@ app.get('/', (req, res) => {
 });
 
 app.get('/declension', async (req, res) => {
-  let { word, case: grammaticalCase } = req.query;
-  const number = req.query.number?.toLowerCase() || 'singular';
+  let { word, case: grammaticalCase, number } = req.query;
 
   if (!word || !grammaticalCase) {
     return res.status(400).send('Missing word or case parameter.');
@@ -44,6 +43,7 @@ app.get('/declension', async (req, res) => {
     // Find the index of that element in the full DOM tree
     const allElements = $('body').find('*').toArray();
     const anchorIndex = allElements.findIndex(el => el.attribs && el.attribs.id === 'Russian');
+    let animacy = false;
 
     if (anchorIndex === -1) {
       return res.status(404).send('Could not locate Russian anchor in DOM.');
@@ -70,8 +70,30 @@ app.get('/declension', async (req, res) => {
       const label = $(cells[0]).text().toLowerCase().trim();
 
       if (label.includes(grammaticalCase)) {
-        const index = number === 'plural' ? 2 : 1; // 1st <td> is singular, 2nd is plural
-        const targetCell = $(cells[index]);
+        let targetCell;
+
+        if (grammaticalCase === 'accusative') {
+          // Check for animate/inanimate split
+          const hasAnimate = $(row).find('th').filter((_, th) => {
+            return $(th).text().toLowerCase().includes('animate');
+          }).length > 0;
+          animacy = $(cells[1]).text().toLowerCase().trim();
+          console.log(animacy)
+
+          if (hasAnimate) {
+            animacy = true;
+            const animateIndex = number === 'plural' ? 3 : 2;
+            targetCell = $(cells[animateIndex]);
+          } else {
+            // No animate/inanimate distinction – fallback to normal logic
+            const index = number === 'plural' ? 2 : 1;
+            targetCell = $(cells[index]);
+          }
+        } else {
+          const index = number === 'plural' ? 2 : 1;
+          targetCell = $(cells[index]);
+        }
+
         const ruSpans = targetCell.find('span[lang="ru"]');
         const forms = [];
 
@@ -90,14 +112,7 @@ app.get('/declension', async (req, res) => {
     }
 
 
-    return res.send({ "word": word, "uppercase_number": number.charAt(0).toUpperCase() + number.slice(1), "grammaticalCase": grammaticalCase, "result": result });
-
-    // // backup
-    // return res.send(`
-    //   <h2>Result for: ${word}</h2>
-    //   <p><strong>Case:</strong> ${grammaticalCase}</p>
-    //   <p><strong>${number.charAt(0).toUpperCase() + number.slice(1)} Form:</strong> ${result}</p>
-    // `);
+    return res.send({ "word": word, "uppercase_number": number.charAt(0).toUpperCase() + number.slice(1), "grammaticalCase": grammaticalCase, "result": result, "hasAnimate": animacy });
 
   } catch (error) {
     console.error(error.message);
