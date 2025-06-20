@@ -81,7 +81,7 @@ app.get('/declension', async (req, res) => {
         });
 
         result = forms.join(', ');
-        return false; // break loop once found
+        return false;
       }
     });
 
