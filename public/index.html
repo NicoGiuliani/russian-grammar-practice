@@ -15,6 +15,7 @@
     }
 
     .container {
+      position: relative;
       background: white;
       padding: 2rem;
       border-radius: 10px;
@@ -64,17 +65,44 @@
     .mode.active {
       display: block;
     }
+    .tab-wrapper {
+      display: flex;
+      position: absolute;
+      top: 0;
+      left: 0;
+      transform: translateY(-100%);
+      margin-bottom: 1rem;
+    }
+
+    .tab-button {
+      padding: 0.5rem 1rem;
+      border: 1px solid #ccc;
+      border-bottom: none;
+      border-radius: 0.5rem 0.5rem 0 0;
+      background-color: #e0e0e0;
+      cursor: pointer;
+      font-weight: bold;
+      margin-right: 2px;
+    }
+    
+    .tab-button.active {
+      color: black;
+      background-color: white;
+    }
+
 
   </style>
   </head>
   <body>
 
     <div class="container">
-      <div id="tabs">
+
+      <div id="tabs" class="tab-wrapper">
         <button class="tab-button active"
           data-mode="lookup">Lookup</button>
         <button class="tab-button" data-mode="test">Test</button>
       </div>
+
       <h1>Russian Declension</h1>
       <div id="mode-lookup" class="mode active">
         <form id="declension-form">
@@ -107,6 +135,7 @@
           <input type="text" id="user-answer"
             placeholder="Your answer in Russian" required />
           <button type="submit">Check</button>
+          <button type="button" id="skip-button">Skip</button>
         </form>
 
         <div id="test-result" style="margin-top: 1rem;"></div>
@@ -116,14 +145,25 @@
     </div>
 
     <script>
-    const wordBank = ['собака', 'дом', 'мама', 'стол', 'река'];
-    const cases = ['nominative', 'accusative', 'genitive', 'dative', 'instrumental', 'prepositional'];
+    // const wordBank = ['собака', 'дом', 'мама', 'стол', 'река'];
+    const wordBank = ['мама'];
+    const cases = ['instrumental'];
+    // const cases = ['nominative', 'accusative', 'genitive', 'dative', 'instrumental', 'prepositional'];
     const numbers = ['singular', 'plural'];
 
     const form = document.getElementById('declension-form');
     const resultDiv = document.getElementById('result');
+    const tabButtons = document.querySelectorAll('.tab-button');
+    const modes = document.querySelectorAll('.mode');
 
     let currentTest = {};
+    let answerDisplayed = false
+
+
+    function stripAccents(str) {
+      return str.normalize("NFD").replace(/\u0301/g, '').toLowerCase().trim();
+    }
+
 
     function generateTestPrompt() {
       const word = wordBank[Math.floor(Math.random() * wordBank.length)];
@@ -138,8 +178,12 @@
       document.getElementById('user-answer').value = '';
     }
 
+
+    // What to do upon submission of the form while in test mode
     document.getElementById('mode-test').addEventListener('submit', async (e) => {
       e.preventDefault();
+
+      document.getElementById('skip-button').textContent = 'Next';
 
       const { word, grammaticalCase, number } = currentTest;
       const resultDiv = document.getElementById('test-result');
@@ -149,21 +193,31 @@
       try {
         const res = await fetch(`/declension?word=${encodeURIComponent(word)}&case=${encodeURIComponent(grammaticalCase)}&number=${encodeURIComponent(number)}`);
         const obj = await res.json();
-        console.log(obj)
+        user_answer = document.getElementById('user-answer').value
+        user_answer = stripAccents(user_answer)
+        correct_answer = stripAccents(obj.result)
+
+        if (correct_answer.includes(',')) {
+          correct_answer = correct_answer.split(',').map(stripAccents)
+          console.log(typeof(correct_answer))
+          console.log(user_answer)
+          console.log(correct_answer.includes(user_answer))
+        }
         const text = `
-          ${document.getElementById('user-answer').value === obj.result ? "<h2 style='color: green'>Correct</h2>" : "<h2 style='color: red'>Incorrect</h2>"}
+          ${correct_answer.includes(user_answer) ? "<h2 style='color: green'>Correct</h2>" : "<h2 style='color: red'>Incorrect</h2>"}
           <p><strong style="font-size: 2rem; font-weight: bold;">${obj.result}</strong></p>
         `
         resultDiv.innerHTML = text;
 
-        // Optionally: call generateTestPrompt(); here to auto-load next word
       } catch (error) {
         resultDiv.textContent = 'An error occurred.';
         console.error(error);
       }
+      document.getElementById('skip-button').focus()
     });
 
 
+    // What to do upon submission of the form while in lookup mode
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
 
@@ -186,11 +240,8 @@
         resultDiv.textContent = 'An error occurred.';
         console.error(error);
       }
+      
     });
-
-
-    const tabButtons = document.querySelectorAll('.tab-button');
-    const modes = document.querySelectorAll('.mode');
 
 
     tabButtons.forEach(button => {
@@ -212,6 +263,12 @@
           }
         });
       });
+    });
+
+    document.getElementById('skip-button').addEventListener('click', () => {
+      document.getElementById('skip-button').textContent = 'Skip';
+      generateTestPrompt();  // just skip to the next word
+      document.getElementById('user-answer').focus()
     });
 
 
